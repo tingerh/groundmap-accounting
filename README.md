@@ -6,6 +6,10 @@ English | [简体中文](README.zh-CN.md)
 
 GroundMap is a local-first knowledge map built on Markdown, Git, stable block anchors, and full-page agent reading. It is designed for teams and solo builders who want auditable, source-grounded knowledge without vector databases, document chunking, or hidden LLM runtime inside the core repository.
 
+> **Upstream and attribution:** This repository is derived from [Qinbf/groundmap](https://github.com/Qinbf/groundmap). GroundMap's core ideas, architecture, and upstream implementation belong to the original project and its contributors. This derivative is maintained under Apache-2.0 and primarily adds domain-specific knowledge content and optional external clients; it does not claim authorship of the upstream theory or implementation. See [NOTICE](NOTICE) and the Git history for attribution and changes.
+
+This derivative adds the `accounting-standards` workspace, an optional read-only enterprise WeChat client, and related query-history and answer-reuse features. Domain knowledge remains separate from the reusable GroundMap engine so upstream changes can be incorporated over time.
+
 ## Why It Exists
 
 Most RAG systems optimize for recall first: split documents into chunks, embed them, retrieve fragments, and ask an LLM to reconstruct context.

@@ -20,6 +20,11 @@ import { runAgent } from "@/lib/agent-loop";
 import { sseLine } from "@/lib/sse";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/default-system-prompt";
 import { executeTool, workspaceContext } from "@/lib/kb-http-client";
+import {
+  findCachedAnswer,
+  saveCachedAnswer,
+  type AnswerCacheContext,
+} from "@/lib/answer-cache";
 
 /**
  * 预热：root_index 内存缓存（5 分钟 TTL）。
@@ -58,6 +63,18 @@ function appendPrewarmedIndex(baseSystem: string, indexContent: string): string 
     "```markdown\n" +
     indexContent +
     "\n```\n"
+  );
+}
+
+function appendWorkspaceGuard(baseSystem: string, workspace: string | undefined): string {
+  if (!workspace) return baseSystem;
+  return (
+    baseSystem +
+    "\n\n---\n\n## 当前工作区（硬约束）\n\n" +
+    `本次查询只能使用 workspace \`${workspace}\`。` +
+    `所有 GroundMap CLI 命令必须包含 \`--workspace ${workspace}\`，` +
+    "不得读取、搜索、猜测或切换到其他 workspace。" +
+    "如果第一次查询失败，只检查命令语法或当前工作区内的索引，不得遍历其他库。"
   );
 }
 
@@ -117,6 +134,25 @@ export async function POST(req: NextRequest) {
 
   const { provider: providerId, model, system, messages, tool_budget, mode, workspace } =
     parsed.data;
+  const lastMessage = messages[messages.length - 1];
+  const rawQuestion = lastMessage.role === "user" ? lastMessage.text?.trim() || "" : "";
+  const forceRefresh = /^\/refresh(?:\s+|$)/i.test(rawQuestion);
+  const question = forceRefresh ? rawQuestion.replace(/^\/refresh\s*/i, "").trim() : rawQuestion;
+  const effectiveMessages = [...messages];
+  if (forceRefresh && question) {
+    effectiveMessages[effectiveMessages.length - 1] = { ...lastMessage, text: question };
+  }
+  const cacheContext: AnswerCacheContext = {
+    provider: providerId,
+    model,
+    mode: mode || "quick",
+    workspace: workspace || "__default__",
+  };
+  // Only cache standalone questions. Follow-ups depend on conversation history.
+  const cacheEligible = messages.length === 1 && !!question;
+  const cacheHit = cacheEligible && !forceRefresh
+    ? findCachedAnswer(question, cacheContext)
+    : null;
   const provider = getProvider(providerId as ProviderId);
   if (!provider) {
     return NextResponse.json({ error: "unknown_provider" }, { status: 400 });
@@ -146,25 +182,60 @@ export async function POST(req: NextRequest) {
           closed = true;
         }
       };
+      if (cacheHit) {
+        safeEnqueue(
+          sseLine({
+            kind: "status",
+            level: "info",
+            text: `历史答案命中（相似度 ${Math.round(cacheHit.similarity * 100)}%）；发送 /refresh 原问题 可重新查询。`,
+          }),
+        );
+        safeEnqueue(sseLine({ kind: "text-delta", text: cacheHit.answer }));
+        safeEnqueue(
+          sseLine({
+            kind: "turn-end",
+            reason: "stop",
+            usage: { input_tokens: 0, output_tokens: 0 },
+          }),
+        );
+        safeEnqueue(sseLine({ kind: "stream-end" }));
+        closed = true;
+        controller.close();
+        return;
+      }
       // 整段逻辑跑在 workspaceContext 作用域内：root_index 预热 + runAgent 深处的所有
       // executeTool 都会读到 workspace，并在调 web 时带上 kb_workspace cookie。
       await workspaceContext.run(workspace, async () => {
         try {
+          let assistantText = "";
+          let completedWithoutError = true;
           const baseSystem = system || DEFAULT_SYSTEM_PROMPT;
           const indexContent = await getRootIndexContent(workspace);
-          const augmentedSystem = appendPrewarmedIndex(baseSystem, indexContent);
+          const augmentedSystem = appendWorkspaceGuard(
+            appendPrewarmedIndex(baseSystem, indexContent),
+            workspace,
+          );
 
           for await (const evt of runAgent({
             provider,
             model,
             system: augmentedSystem,
-            messages,
+            messages: effectiveMessages,
             toolBudget: tool_budget,
             mode,
             signal: abortController.signal,
           })) {
             if (abortController.signal.aborted) break;
+            if (evt.kind === "text-delta") assistantText += evt.text;
+            if (evt.kind === "turn-end" && evt.reason === "error") completedWithoutError = false;
             safeEnqueue(sseLine(evt));
+          }
+          if (cacheEligible && completedWithoutError && !abortController.signal.aborted) {
+            const matches = [...assistantText.matchAll(/(?:\*\*)?【\s*ANSWER\s*】[^\n]*(?:\*\*)?/gi)];
+            const finalMarker = matches.at(-1);
+            if (finalMarker?.index !== undefined) {
+              saveCachedAnswer(question, assistantText.slice(finalMarker.index), cacheContext);
+            }
           }
           safeEnqueue(sseLine({ kind: "stream-end" }));
         } catch (e) {

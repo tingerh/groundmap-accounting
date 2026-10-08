@@ -5,9 +5,14 @@
  * 与 LocaleSwitcher 的 cookie + reload 模式一致。只有 1 个 workspace 时不渲染。
  */
 import { useEffect, useState } from "react";
-import { useT } from "@/lib/i18n-client";
+import { useT, type TranslationKey } from "@/lib/i18n-client";
 
 const WORKSPACE_COOKIE = "kb_workspace";
+
+const WORKSPACE_LABEL_KEYS: Record<string, TranslationKey> = {
+  "accounting-standards": "workspace.label.accounting_standards",
+  "h-share": "workspace.label.h_share",
+};
 
 export function WorkspaceSwitcher() {
   const t = useT();
@@ -51,11 +56,11 @@ export function WorkspaceSwitcher() {
       onChange={(e) => onChange(e.target.value)}
       title={t("workspace.switch_title")}
       aria-label={t("workspace.aria")}
-      className="h-8 rounded-md border border-input bg-background px-2 text-xs font-mono text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      className="h-8 min-w-32 rounded-md border border-input bg-background px-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-1 focus:ring-ring"
     >
       {workspaces.map((ws) => (
         <option key={ws} value={ws}>
-          {ws}
+          {WORKSPACE_LABEL_KEYS[ws] ? t(WORKSPACE_LABEL_KEYS[ws]) : ws}
         </option>
       ))}
     </select>

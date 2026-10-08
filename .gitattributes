@@ -18,3 +18,6 @@
 *.xls binary
 *.epub binary
 *.msg binary
+
+# Local-only soft-delete records must not appear in public release archives.
+workspaces/*/wiki/_archive_private/** export-ignore

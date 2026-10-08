@@ -66,6 +66,8 @@ export const TRANSLATIONS = {
 
     "workspace.switch_title": "切换知识库（workspace）",
     "workspace.aria": "选择 workspace",
+    "workspace.label.accounting_standards": "企业会计准则",
+    "workspace.label.h_share": "H股业务",
 
     "common.back": "返回",
     "common.cancel": "取消",
@@ -523,6 +525,8 @@ export const TRANSLATIONS = {
 
     "workspace.switch_title": "Switch knowledge base (workspace)",
     "workspace.aria": "Select workspace",
+    "workspace.label.accounting_standards": "Accounting Standards",
+    "workspace.label.h_share": "H-share Business",
 
     "common.back": "Back",
     "common.cancel": "Cancel",

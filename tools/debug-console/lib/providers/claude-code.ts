@@ -87,7 +87,18 @@ export class ClaudeCodeProvider implements Provider {
       "--dangerously-skip-permissions",
     ];
     if (input.system) {
-      args.push("--append-system-prompt", input.system);
+      const windowsRuntimeGuidance = `
+
+## Windows runtime constraints
+
+You are running in Windows PowerShell. Prefer the native Read, Grep, and Glob tools for file access.
+When invoking GroundMap CLI, use this exact argument order:
+\`python scripts/k.py --workspace <workspace> <subcommand> [arguments] --json\`.
+Do not emit Unix shell syntax such as \`head\`, \`tail\`, \`2>/dev/null\`, \`&&\`, or \`||\`.
+Do not change directory before invoking \`scripts/k.py\`; the process already starts in the GroundMap root.
+If a command fails, inspect its error once and correct the command instead of repeating equivalent searches.
+`;
+      args.push("--append-system-prompt", input.system + windowsRuntimeGuidance);
     }
 
     let proc;

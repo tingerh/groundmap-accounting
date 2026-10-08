@@ -15,6 +15,30 @@ import k
 from conftest import write_md, standard_fm
 
 
+def test_searches_local_mof_source_body(tmp_path, monkeypatch):
+    monkeypatch.setattr(k, "PROJECT_ROOT", tmp_path)
+    raw = tmp_path / "raw/articles/mof/qa/20260918_123/article.md"
+    raw.parent.mkdir(parents=True)
+    raw.write_text("# 问答\n\n合同资产减值准备的具体处理。", encoding="utf-8")
+    page = k.Page(
+        path="wiki/sources/mof_qa_20260918_123.md",
+        title="问答来源",
+        type="source_summary",
+        status="draft",
+        confidence="medium",
+        last_modified="2026-09-18",
+        last_modified_by="LLM",
+        tags=[],
+        sources=["[[raw/articles/mof/qa/20260918_123/article.md]]"],
+        source_count=1,
+        raw_content="仅含来源入口",
+    )
+    results = k.search_pages("合同资产减值准备", [page])
+    assert results[0]["path"] == page.path
+    assert "合同资产减值准备" in results[0]["snippet"]
+
+
+
 # ============================================================
 # mask_code_spans
 # ============================================================

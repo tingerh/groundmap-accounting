@@ -1,0 +1,38 @@
+---
+title: "企业会计准则第38号——首次执行企业会计准则"
+type: source_summary
+created_date: 2026-08-28
+last_modified: 2026-08-28
+last_modified_by: LLM
+status: draft
+confidence: medium
+source_count: 1
+sources:
+  - "[[raw/papers/standards/01_企业会计准则_财政部/044_企业会计准则第38号——首次执行企业会计准则.md]]"
+tags:
+  - accounting-standards
+  - standard
+  - first-time-adoption
+---
+
+# 企业会计准则第38号——首次执行企业会计准则
+
+## 核心论点
+
+- 本来源是 `首次执行企业会计准则` 主题的企业会计准则原文，作为概念页和后续应用指南、案例资料的基础来源。 [[raw/papers/standards/01_企业会计准则_财政部/044_企业会计准则第38号——首次执行企业会计准则.md#^h-1-1-0e5b3a]]
+
+## AI 综合判断
+
+### 核心价值
+
+本来源支撑 [[wiki/concepts/first_time_adoption|SUPPORTS]] 的准则原文入口；后续需要继续摄入应用指南、解释公告、监管问答和案例。 [[raw/papers/standards/01_企业会计准则_财政部/044_企业会计准则第38号——首次执行企业会计准则.md#^h-1-1-0e5b3a]]
+
+### 关联
+
+- [[wiki/concepts/first_time_adoption]]
+- [[wiki/indexes/standards_system_index]]
+- [[wiki/indexes/topics_index]]
+
+### 冲突
+
+本次未识别与既有知识库内容的冲突。

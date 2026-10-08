@@ -3,6 +3,13 @@ Copyright (c) 2026 GroundMap contributors
 
 This product includes software developed as part of the GroundMap project.
 
+The original GroundMap project and its core design were created by Qinbf:
+https://github.com/Qinbf/groundmap
+
+This repository is a derivative work that adds domain-specific knowledge-base
+content and optional external clients. It does not claim authorship of the
+original GroundMap architecture, concepts, or upstream implementation.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at

@@ -12,6 +12,17 @@ import type { FlowNodeData } from "@/lib/build-flow-graph";
 import type { QueryMode } from "@/lib/default-system-prompt";
 import { FlowGraph } from "./FlowGraph";
 import { useT } from "@/lib/i18n-client";
+import {
+  directoryKey,
+  exportTranscript,
+  loadQuestionGroups,
+  loadTranscript,
+  normalizeQuestionGroups,
+  saveQuestionGroups,
+  saveTranscript,
+  transcriptKey,
+  type QuestionGroup,
+} from "@/lib/transcript-storage";
 
 interface Props {
   provider: string;
@@ -67,15 +78,65 @@ export function ChatPanel({
 }: Props) {
   const t = useT();
   const [messages, setMessages] = useState<UIMessage[]>([]);
+  const storageKey = transcriptKey(workspace);
+  const groupsStorageKey = directoryKey(storageKey);
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
+  const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([]);
+  const [manageGroups, setManageGroups] = useState(false);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [saveFailed, setSaveFailed] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<"chat" | "flow">("chat");
+  const [showQuestionIndex, setShowQuestionIndex] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // 「黏底」状态：仅当用户已经在底部时，流式增量才自动滚到底；
   // 一旦用户往上滚查看历史，就停止自动滚动，避免被流式输出一直往下拽。
   const stickToBottomRef = useRef(true);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+
+  useEffect(() => {
+    const loadedMessages = loadTranscript(window.localStorage, storageKey);
+    setMessages(loadedMessages);
+    setQuestionGroups(
+      normalizeQuestionGroups(
+        loadQuestionGroups(window.localStorage, groupsStorageKey),
+        loadedMessages,
+      ),
+    );
+    setSelectedGroupIds([]);
+    setManageGroups(false);
+    setEditingGroupId(null);
+    setHydratedKey(storageKey);
+  }, [groupsStorageKey, storageKey]);
+
+  useEffect(() => {
+    if (hydratedKey !== storageKey) return;
+    const transcriptSaved = saveTranscript(window.localStorage, storageKey, messages);
+    const groupsSaved = saveQuestionGroups(window.localStorage, groupsStorageKey, questionGroups);
+    setSaveFailed(!transcriptSaved || !groupsSaved);
+  }, [groupsStorageKey, hydratedKey, messages, questionGroups, storageKey]);
+
+  useEffect(() => {
+    if (hydratedKey !== storageKey) return;
+    setQuestionGroups((current) => {
+      const next = normalizeQuestionGroups(current, messages);
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [hydratedKey, messages, storageKey]);
+
+  const downloadTranscript = () => {
+    const content = exportTranscript(messages);
+    const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `groundmap-${workspace ?? "default"}-conversation.md`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   const latestAssistant =
     [...messages].reverse().find((m) => m.role === "assistant") || null;
@@ -241,7 +302,7 @@ export function ChatPanel({
         }))
         .filter((m) => m.text),
       { role: "user" as const, text },
-    ];
+    ].slice(-50);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -346,6 +407,86 @@ export function ChatPanel({
   };
 
   const userCount = messages.filter((m) => m.role === "user").length;
+  const questionById = new Map(
+    messages
+      .filter((message) => message.role === "user")
+      .map((message) => [
+        message.id,
+        message.parts
+        .filter((part) => part.kind === "text")
+        .map((part) => (part as { text: string }).text)
+        .join("")
+        .trim(),
+      ]),
+  );
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroupIds((current) =>
+      current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId],
+    );
+  };
+
+  const mergeSelectedGroups = () => {
+    if (selectedGroupIds.length < 2) return;
+    const selected = new Set(selectedGroupIds);
+    const firstIndex = questionGroups.findIndex((group) => selected.has(group.id));
+    const mergedGroups = questionGroups.filter((group) => selected.has(group.id));
+    const merged: QuestionGroup = {
+      id: `g-merged-${Date.now()}`,
+      title: mergedGroups[0].title,
+      userMessageIds: mergedGroups.flatMap((group) => group.userMessageIds),
+    };
+    const remaining = questionGroups.filter((group) => !selected.has(group.id));
+    remaining.splice(firstIndex, 0, merged);
+    setQuestionGroups(remaining);
+    setSelectedGroupIds([]);
+    setManageGroups(false);
+    setEditingGroupId(merged.id);
+    setEditingTitle(merged.title);
+  };
+
+  const splitGroup = (group: QuestionGroup) => {
+    if (group.userMessageIds.length < 2) return;
+    setQuestionGroups((current) =>
+      current.flatMap((item) =>
+        item.id === group.id
+          ? group.userMessageIds.map((messageId) => ({
+              id: `g-${messageId}`,
+              title: questionById.get(messageId) || t("chat.untitled"),
+              userMessageIds: [messageId],
+            }))
+          : [item],
+      ),
+    );
+  };
+
+  const startRename = (group: QuestionGroup) => {
+    setEditingGroupId(group.id);
+    setEditingTitle(group.title);
+  };
+
+  const finishRename = () => {
+    if (!editingGroupId) return;
+    const title = editingTitle.trim();
+    if (title) {
+      setQuestionGroups((current) =>
+        current.map((group) => (group.id === editingGroupId ? { ...group, title } : group)),
+      );
+    }
+    setEditingGroupId(null);
+    setEditingTitle("");
+  };
+
+  const jumpToQuestion = (messageId: string) => {
+    document.getElementById(`message-${messageId}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    stickToBottomRef.current = false;
+    setShowJumpToBottom(true);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -390,35 +531,138 @@ export function ChatPanel({
           ) : (
             <span>{t("chat.turns", { n: userCount })}</span>
           )}
+          {view === "chat" && userCount > 0 && (
+            <button
+              onClick={() => setShowQuestionIndex((open) => !open)}
+              className="text-[var(--paper-dim)] transition-colors hover:text-[var(--amber)]"
+              aria-expanded={showQuestionIndex}
+            >
+              {showQuestionIndex ? t("chat.index_hide") : t("chat.index_show")}
+            </button>
+          )}
         </div>
       </div>
 
       {/* ─── 主区 ─── */}
       {view === "chat" ? (
-        <div className="relative flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+        <div className="relative flex flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+          {showQuestionIndex && questionGroups.length > 0 && (
+            <aside className="hidden w-64 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--ink-2)]/35 md:flex">
+              <div className="border-b border-[var(--line)] px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="k-eyebrow text-[var(--amber)]">{t("chat.index_title")}</div>
+                    <div className="mt-1 text-[10.5px] text-[var(--paper-mute)]">
+                      {t("chat.index_count", { n: questionGroups.length })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setManageGroups((value) => !value);
+                      setSelectedGroupIds([]);
+                    }}
+                    className="text-[10.5px] text-[var(--paper-dim)] hover:text-[var(--amber)]"
+                  >
+                    {manageGroups ? t("chat.manage_done") : t("chat.manage")}
+                  </button>
+                </div>
+                {manageGroups && (
+                  <button
+                    onClick={mergeSelectedGroups}
+                    disabled={selectedGroupIds.length < 2}
+                    className="mt-3 w-full border border-[var(--line)] px-2 py-1.5 text-[10.5px] text-[var(--paper-dim)] hover:border-[var(--amber)] hover:text-[var(--amber)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {t("chat.merge_selected", { n: selectedGroupIds.length })}
+                  </button>
+                )}
+              </div>
+              <nav className="flex-1 overflow-y-auto p-2" aria-label={t("chat.index_title")}>
+                {questionGroups.map((group, questionIndex) => (
+                  <div
+                    key={group.id}
+                    className="mb-1 border-l-2 border-transparent px-2 py-2 text-[11.5px] text-[var(--paper-dim)] hover:border-[var(--amber)] hover:bg-[var(--ink-2)]"
+                  >
+                    <div className="flex items-start gap-2">
+                      {manageGroups && (
+                        <input
+                          type="checkbox"
+                          checked={selectedGroupIds.includes(group.id)}
+                          onChange={() => toggleGroupSelection(group.id)}
+                          aria-label={t("chat.select_entry", { n: questionIndex + 1 })}
+                          className="mt-0.5 accent-[var(--amber)]"
+                        />
+                      )}
+                      <span className="shrink-0 font-mono text-[var(--amber)]">
+                        {String(questionIndex + 1).padStart(2, "0")}
+                      </span>
+                      {editingGroupId === group.id ? (
+                        <input
+                          value={editingTitle}
+                          onChange={(event) => setEditingTitle(event.target.value)}
+                          onBlur={finishRename}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") finishRename();
+                            if (event.key === "Escape") setEditingGroupId(null);
+                          }}
+                          autoFocus
+                          maxLength={80}
+                          className="k-input min-w-0 flex-1 px-1 py-0.5 text-[11.5px]"
+                          aria-label={t("chat.rename_input")}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => jumpToQuestion(group.userMessageIds[0])}
+                          className="min-w-0 flex-1 text-left leading-relaxed hover:text-[var(--paper)]"
+                          title={group.title}
+                        >
+                          <span className="line-clamp-2 break-words">{group.title}</span>
+                        </button>
+                      )}
+                    </div>
+                    {editingGroupId !== group.id && (
+                      <div className="mt-1 flex justify-end gap-2 text-[10px] text-[var(--paper-mute)]">
+                        {group.userMessageIds.length > 1 && (
+                          <span>{t("chat.group_questions", { n: group.userMessageIds.length })}</span>
+                        )}
+                        <button onClick={() => startRename(group)} className="hover:text-[var(--amber)]">
+                          {t("chat.rename")}
+                        </button>
+                        {group.userMessageIds.length > 1 && (
+                          <button onClick={() => splitGroup(group)} className="hover:text-[var(--amber)]">
+                            {t("chat.split")}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </nav>
+            </aside>
+          )}
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="h-full overflow-y-auto px-7 py-6"
+            className="h-full min-w-0 flex-1 overflow-y-auto px-7 py-6"
           >
             {messages.length === 0 && <EmptyState />}
             {messages.map((m, idx) => (
-              <MessageBubble
-                key={m.id}
-                msg={m}
-                index={
-                  m.role === "user"
-                    ? messages
-                        .slice(0, idx + 1)
-                        .filter((x) => x.role === "user").length
-                    : m.role === "assistant"
+              <div key={m.id} id={`message-${m.id}`} className="scroll-mt-4">
+                <MessageBubble
+                  msg={m}
+                  index={
+                    m.role === "user"
                       ? messages
                           .slice(0, idx + 1)
-                          .filter((x) => x.role === "assistant").length
-                      : 0
-                }
-                onOpenRef={onOpenRef}
-              />
+                          .filter((x) => x.role === "user").length
+                      : m.role === "assistant"
+                        ? messages
+                            .slice(0, idx + 1)
+                            .filter((x) => x.role === "assistant").length
+                        : 0
+                  }
+                  onOpenRef={onOpenRef}
+                />
+              </div>
             ))}
           </div>
           {showJumpToBottom && (
@@ -459,7 +703,7 @@ export function ChatPanel({
             disabled={busy}
           />
         </div>
-        <div className="mt-3 flex items-center gap-3 border-t border-dashed border-[var(--line)] pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-dashed border-[var(--line)] pt-3">
           <button
             onClick={send}
             disabled={busy || !input.trim()}
@@ -475,6 +719,16 @@ export function ChatPanel({
           <span className="text-[10.5px] uppercase tracking-[0.18em] text-[var(--paper-mute)]">
             {t("chat.send_hint")}
           </span>
+          <span className={`text-[10.5px] ${saveFailed ? "text-[var(--vermilion)]" : "text-[var(--paper-mute)]"}`}>
+            {t(saveFailed ? "chat.save_failed" : "chat.saved_locally")}
+          </span>
+          <button
+            onClick={downloadTranscript}
+            disabled={busy || messages.length === 0}
+            className="text-[10.5px] uppercase text-[var(--paper-mute)] hover:text-[var(--amber)] disabled:opacity-40"
+          >
+            {t("chat.export")}
+          </button>
           <button
             onClick={() => setMessages([])}
             disabled={busy}

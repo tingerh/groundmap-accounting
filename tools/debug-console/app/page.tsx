@@ -6,6 +6,7 @@ import { ModePicker } from "@/components/ModePicker";
 import { WorkspaceIndicator } from "@/components/WorkspaceIndicator";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { PreviewPanel } from "@/components/PreviewPanel";
+import { WecomHistoryPanel } from "@/components/WecomHistoryPanel";
 import { useT } from "@/lib/i18n-client";
 import type { WikiRef } from "@/lib/wiki-ref";
 import type { FlowNodeData } from "@/lib/build-flow-graph";
@@ -29,11 +30,13 @@ export default function Page() {
   const [showSystem, setShowSystem] = useState(false);
   const [previewRef, setPreviewRef] = useState<WikiRef | null>(null);
   const [previewNode, setPreviewNode] = useState<FlowNodeData | null>(null);
+  const [showWecomHistory, setShowWecomHistory] = useState(false);
   const hasPreview = !!previewRef || !!previewNode;
 
   // 要查的库：?ws 参数（web 顶栏点进来时带，反映 web 当前所在库）> web 当前默认库。
   // 控制台是 web 的外部客户端，**不**提供独立切换——避免控制台查的库与 web 浏览的库不一致。
   const [workspace, setWorkspace] = useState<string | null>(null);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
 
   const openRef = (r: WikiRef) => {
     setPreviewNode(null);
@@ -72,10 +75,12 @@ export default function Page() {
             ? d.current
             : null;
         setWorkspace(chosen);
+        setWorkspaceReady(true);
       })
       .catch(() => {
         // 库列表取不到（web 没起）：用 ?ws 兜底，web 端会再校验一次 cookie
         setWorkspace(fromUrl && WS_RE.test(fromUrl) ? fromUrl : null);
+        setWorkspaceReady(true);
       });
   }, []);
 
@@ -145,6 +150,12 @@ export default function Page() {
             >
               {showSystem ? "▼ prompt" : "▸ prompt"}
             </button>
+            <button
+              onClick={() => setShowWecomHistory((current) => !current)}
+              className="k-btn"
+            >
+              {showWecomHistory ? t("wecom.back") : t("wecom.open")}
+            </button>
             <LocaleSwitcher />
           </div>
         </div>
@@ -198,32 +209,41 @@ export default function Page() {
 
       {/* ─── 聊天主区 + 可选右侧分屏 ─── */}
       <div className="flex flex-1 overflow-hidden">
-        <div
-          className={`overflow-hidden ${
-            hasPreview ? "w-3/5 border-r border-[var(--line)]" : "w-full"
-          }`}
-        >
-          <ChatPanel
-            provider={provider}
-            model={model}
-            system={system}
-            toolBudget={toolBudget}
-            mode={mode}
-            workspace={workspace}
-            onOpenRef={openRef}
-            onOpenNode={openNode}
-          />
-        </div>
-        {hasPreview && (
-          <div className="w-2/5 overflow-hidden">
-            <PreviewPanel
-              refData={previewRef}
-              nodeData={previewNode}
-              workspace={workspace}
-              onClose={closePreview}
-              onOpenRef={openRef}
-            />
+        {showWecomHistory ? (
+          <div className="w-full overflow-hidden">
+            <WecomHistoryPanel onClose={() => setShowWecomHistory(false)} />
           </div>
+        ) : (
+          <>
+            <div
+              className={`overflow-hidden ${
+                hasPreview ? "w-3/5 border-r border-[var(--line)]" : "w-full"
+              }`}
+            >
+              {workspaceReady && <ChatPanel
+                key={workspace ?? "__default__"}
+                provider={provider}
+                model={model}
+                system={system}
+                toolBudget={toolBudget}
+                mode={mode}
+                workspace={workspace}
+                onOpenRef={openRef}
+                onOpenNode={openNode}
+              />}
+            </div>
+            {hasPreview && (
+              <div className="w-2/5 overflow-hidden">
+                <PreviewPanel
+                  refData={previewRef}
+                  nodeData={previewNode}
+                  workspace={workspace}
+                  onClose={closePreview}
+                  onOpenRef={openRef}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

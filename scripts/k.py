@@ -384,7 +384,17 @@ def search_pages(query, pages, limit=20):
     results = []
     for page in pages:
         title_lower = page.title.lower()
-        content_lower = page.raw_content.lower()
+        searchable_content = page.raw_content
+        if page.path.startswith("wiki/sources/mof_") and page.sources:
+            source_match = re.fullmatch(
+                r"\[\[(raw/articles/mof/(?:qa|case|other)/\d{8}_\d+/article\.md)\]\]",
+                page.sources[0],
+            )
+            if source_match:
+                source_path = PROJECT_ROOT / source_match.group(1)
+                if source_path.is_file():
+                    searchable_content += "\n" + source_path.read_text(encoding="utf-8")
+        content_lower = searchable_content.lower()
 
         score = 0
         for term in terms:
@@ -398,7 +408,7 @@ def search_pages(query, pages, limit=20):
                 if idx >= 0:
                     start = max(0, idx - 60)
                     end = min(len(content_lower), idx + 120)
-                    snippet = page.raw_content[start:end].replace("\n", " ").strip()
+                    snippet = searchable_content[start:end].replace("\n", " ").strip()
                     if start > 0:
                         snippet = "..." + snippet
                     if end < len(content_lower):
