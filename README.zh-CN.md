@@ -63,8 +63,8 @@ GroundMap 推荐配合 **Claude Code**、**Codex**、Cursor 类智能体，或�
 - npm
 
 ```bash
-git clone https://github.com/Qinbf/groundmap.git
-cd groundmap
+git clone https://github.com/tingerh/groundmap-accounting.git
+cd groundmap-accounting
 
 make setup
 make test

@@ -16,8 +16,8 @@ Hands-on companion examples live under `docs/examples/`; a step-by-step illustra
 ## Install
 
 ```bash
-git clone https://github.com/Qinbf/groundmap.git
-cd groundmap
+git clone https://github.com/tingerh/groundmap-accounting.git
+cd groundmap-accounting
 make setup
 ```
 
