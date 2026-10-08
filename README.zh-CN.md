@@ -1,14 +1,44 @@
-# GroundMap
+# GroundMap Accounting
 
-面向人类和 AI agent 的来源驱动知识地图。
+**企业会计准则专业知识库**
 
-[English](README.md) | 简体中文
+基于 GroundMap 构建的可溯源会计准则知识库，面向财务、审计、会计咨询和企业财务报告工作。它将准则原文、应用指南、准则解释、财政部实施问答、应用案例和实务分析组织为可以查询、核验、更新和复核的 Markdown 知识体系。
+
+[准则库首页](workspaces/accounting-standards/wiki/root_index.md) · [准则体系](workspaces/accounting-standards/wiki/indexes/standards_system_index.md) · [财政部官方资料](workspaces/accounting-standards/wiki/indexes/mof_official_materials_index.md) · [企业微信机器人](tools/wecom-bot/README.md) · [项目介绍](docs/专业知识库项目介绍-双版本.md)
+
+## 这套知识库解决什么问题
+
+- **把文件变成知识**：以基本准则和第1号至第42号具体准则为主干，连接应用指南、准则解释、官方问答和应用案例。
+- **按专业问题组织**：收入、金融工具、租赁、企业合并等是主概念，确认、计量、列报、披露和常见判断作为子专题。
+- **结论可以回到原文**：重要论断使用块级锚点指向来源中的具体标题、段落或表格。
+- **支持现场查询**：既可以在 Web 管理台中研究和维护，也可以通过企业微信机器人进行只读查询。
+- **让查询反哺知识**：记录高频问题、失败查询和引用情况，帮助管理员发现资料缺口并持续完善专题。
+- **保留知识演进过程**：Markdown 是唯一真相源，Git 记录修改，冲突不会被静默覆盖。
+
+![企业会计准则知识库 Web 管理台](docs/images/screenshots/web-console-page.png)
+
+## 从这里开始
+
+| 入口 | 用途 |
+|---|---|
+| [`workspaces/accounting-standards/`](workspaces/accounting-standards/) | 企业会计准则知识库主体 |
+| [准则体系索引](workspaces/accounting-standards/wiki/indexes/standards_system_index.md) | 基本准则及第1号至第42号具体准则 |
+| [财政部官方资料索引](workspaces/accounting-standards/wiki/indexes/mof_official_materials_index.md) | 实施问答、应用案例及其他规定 |
+| [重点专题索引](workspaces/accounting-standards/wiki/indexes/topics_index.md) | 收入、金融工具、租赁、合并报表等专题 |
+| [企业微信机器人](tools/wecom-bot/README.md) | 面向测试成员的只读查询入口 |
+| [双版本项目介绍](docs/专业知识库项目介绍-双版本.md) | 对外介绍和 GitHub 发布文案 |
+
+## 与 GroundMap 的关系
+
+本仓库继承自 [Qinbf/groundmap](https://github.com/Qinbf/groundmap)。GroundMap 的核心理念、架构设计和上游实现归原项目及其贡献者所有；本仓库是在 Apache-2.0 许可下进行的派生开发，主要增加企业会计准则知识内容、企业微信只读客户端和查询管理功能，不主张对上游理论与实现的原创权。完整归属说明见 [NOTICE](NOTICE)。
+
+专业知识内容与通用引擎保持分层，便于持续吸收上游更新。以下内容保留 GroundMap 引擎的原始技术说明。
+
+---
+
+## GroundMap 引擎
 
 GroundMap 是一个本地优先的知识地图，建立在 Markdown、Git、稳定块级锚点和 agent 完整页面阅读之上。它适合想要"可审计、可溯源"知识库的团队和个人开发者，同时避免把向量数据库、文档切片、隐藏的 LLM runtime 塞进知识库核心仓库。
-
-> **上游项目与原创归属**：本仓库继承自 [Qinbf/groundmap](https://github.com/Qinbf/groundmap)。GroundMap 的核心理念、架构设计和上游实现归原项目及其贡献者所有；本仓库是在 Apache-2.0 许可下进行的派生开发，主要增加专业知识库内容和可选外部客户端，不主张对上游理论与实现的原创权。修改内容与完整归属说明见 Git 历史和 [NOTICE](NOTICE)。
-
-本派生版本增加了 `accounting-standards` 企业会计准则工作区、可选的企业微信只读查询客户端，以及相关的查询记录和回答复用功能。专业知识内容与 GroundMap 通用引擎保持分层，便于后续同步上游更新。
 
 ## 为什么需要它
 
@@ -224,9 +254,9 @@ GroundMap 刻意不包含：
 
 ## 学习与交流
 
-想持续关注前沿 AI 技术与应用、AI 与科研结合的案例，以及 GroundMap / 智能体工作流实践，可以关注作者个人公众号：**覃秉丰AI**。公众号也会发布 GroundMap 教程、实践案例和相关学习资源。
+欢迎与我讨论更多。
 
-<img src="docs/images/community/qinbf-ai-wechat.png" alt="微信公众号：覃秉丰AI" width="560">
+<img src="docs/images/community/tingerh-wechat-official-account.jpg" alt="微信公众号二维码" width="430">
 
 ## 路线图
 
